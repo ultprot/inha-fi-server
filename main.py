@@ -97,11 +97,13 @@ def hello():
 #----------------------
 
 #---------------------------------------------------------------------------------------------------
-@app.route("/post",methods=['POST'])
+@app.route("/query",methods=['POST'])
 def query():
     if request.method == 'POST':
         print(request.get_json())   #전달받은 json 빼내기
-        querymun=request.get_json()['value']    #사용자 입력 걸러내기
+        latitude=request.get_json()['lat']  #사용자 위도
+        longitude=request.get_json()['lon']
+        querymun=request.get_json()['query']    #사용자 입력 걸러내기
         response_json=detect_intent_texts(                      #
         "guidance-2d934", str(uuid.uuid4()), querymun, 'ko')    #df에 쿼리
         intent=response_json["intent"]["displayName"]   #인텐트 빼내기
