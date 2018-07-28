@@ -1,4 +1,4 @@
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 #!/usr/bin/env python
 
 # Copyright 2017 Google LLC
@@ -55,22 +55,14 @@ def detect_intent_texts(project_id, session_id, texts, language_code):
     response = session_client.detect_intent(
         session=session, query_input=query_input)
 
-        #print('=' * 20)
-        #print('Query text: {}'.format(response.query_result.query_text))
-        #print('Detected intent: {} (confidence: {})\n'.format(
-        #    response.query_result.intent.display_name,
-        #    response.query_result.intent_detection_confidence))
-        #print('Fulfillment text: {}\n'.format(
-        #    response.query_result.fulfillment_text))
-    #print(response.query_result.parameters["fields"][0])
     response_json=MessageToJson(response.query_result)
     response_json=json.loads(response_json)
-    print(response_json["parameters"]["any"])
+    print(response_json["fulfillmentText"])
     return str(response_json)
 # [END dialogflow_detect_intent_text]
 
 
 if __name__ == '__main__':
-    querymun="인하대 가는 길 알려줘"
+    querymun=input('>')
     detect_intent_texts(
         "guidance-2d934",str(uuid.uuid4()), querymun, 'ko')

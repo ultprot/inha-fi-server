@@ -46,9 +46,14 @@ class TmapCli:
         print(payload)
         response=requests.post(URL,params=params,headers=headers,data=payload)
         return response.text
+    def busstin(self,id):
+        URL='https://api.odsay.com/v1/api/busStationInfo'
+        params={'apiKey':'NOpPHl1h784/Y6ttQNevqSMqzH/QsBfclZevLg3G7c0','stationID':'107475'}
+        response=requests.get(URL,params=params)
+        return response.text
+
 
 tc = TmapCli()
-poi=tc.poiSearch('서울역')
+poi=tc.busstin(107475)
 print(poi)
-rst=tc.pedesSearch(poi)
-print(str(rst))
+print(str(poi))
