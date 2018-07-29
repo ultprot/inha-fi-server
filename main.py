@@ -87,6 +87,21 @@ class TmapCli:
         response=requests.post(URL,params=params,headers=headers,data=payload)
         rstJson=json.loads(response.text)
         return rstJson
+    def pedesSearchByCo(self,startLon,startLat,endLon,endLat):
+        URL='https://api2.sktelecom.com/tmap/routes/pedestrian'
+        params=\
+        {'version':'1'}
+        headers=\
+        {'Accept':'application/json',\
+        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',\
+        'appKey':key["tmap"]}
+        payload=\
+        {'startX':startLon,'startY':startLat,\
+        'endX':endLon,'endY':endLat,\
+        'startName':'st','endName':'en'}
+        response=requests.post(URL,params=params,headers=headers,data=payload)
+        rstJson=json.loads(response.text)
+        return rstJson
     def publicSearch(self,startLon,startLat,endLon,endLat): #대중교통 경로 검색
         URL='https://api.odsay.com/v1/api/searchPubTransPath'
         params=\
@@ -139,10 +154,10 @@ def query():
             fulfillmentText=response_json["fulfillmentText"]    #대답
             rstJson={"sessionID":sessionID, "intent":intent,"fulfillmentText":fulfillmentText}
             data={}
-            if "poi_dest" in response_json["parameters"]:
-                data["dest"]=response_json["parameters"]["poi_dest"]
-            elif "poi_number" in response_json["parameters"]:
+            if response_json["parameters"]["poi_number"] != "":
                 data["number"]=response_json["parameters"]["poi_number"]
+            elif "poi_dest" in response_json["parameters"]:
+                data["dest"]=response_json["parameters"]["poi_dest"]
             rstJson["data"]=data
             response=Response(
                 response=json.dumps(rstJson,ensure_ascii=False),
@@ -209,6 +224,24 @@ def query():
         return "error"
 #-------------------------------------------------------------------------------------------------------
 
+#----------------------
+@app.route("/pedes",methods=['POST'])
+def pedes():
+    if request.method =='POST':
+        lat=request.get_json()['lat']  #사용자 위도
+        lon=request.get_json()['lon'] #사용자 경도
+        endLat=request.get_json()['endLat']
+        endLon=request.get_json()['endLon']
+        tc=TmapCli()
+        path=tc.pedesSearchByCo(lon,lat,endLon,endLat)
+        rstJson={"intent":"pedes_search","fulfillmentText":"보행 경로를 안내합니다.", "data":path,}#poi 결과 담아서 보냄
+        response=Response(
+            response=json.dumps(rstJson,ensure_ascii=False),
+            status=200,
+            mimetype='application/json;charset=UTF-8'
+        )
+        return response
+#----------------------
 
 
 if __name__ == "__main__":
