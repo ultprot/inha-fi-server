@@ -3,7 +3,8 @@ from flask import Flask,json    #flask용 package
 from flask import jsonify       #
 from flask import request       #
 import requests
-
+from xml.etree.ElementTree import XML, fromstring, tostring, fromstringlist
+import html
 with open('./apiKeys.json') as apiKeyFile:
     key=json.load(apiKeyFile)
 
@@ -46,14 +47,48 @@ class TmapCli:
         print(payload)
         response=requests.post(URL,params=params,headers=headers,data=payload)
         return response.text
-    def busstin(self,id):
-        URL='https://api.odsay.com/v1/api/busStationInfo'
-        params={'apiKey':'NOpPHl1h784/Y6ttQNevqSMqzH/QsBfclZevLg3G7c0','stationID':'107475'}
+    def getStationByPos(self,radius,lon,lat):   #좌표기반 근접정류소 목록 조회
+        URL='http://ws.bus.go.kr/api/rest/stationinfo/getStationByPos'
+        params={"ServiceKey":key["arrival"],"tmX":lon,"tmY":lat,"radius":radius}
         response=requests.get(URL,params=params)
-        return response.text
-
-
+        myxml=fromstring(response.text)
+        return myxml
+    def getArrivalInfo(self,arsId):
+        URL='http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid'
+        params={"ServiceKey":key["arrival"], "arsId":arsId}
+        response=requests.get(URL,params=params)
+        myxml=fromstring(response.text)
+        return myxml
+    def getArrivalInf(self,stId,busRouteId,ord):
+        URL='http://ws.bus.go.kr/api/rest/arrive/getArrInfoByRoute'
+        params={"ServiceKey":key["arrival"], "stId":stId,"busRouteId":busRouteId,"ord":ord}
+        response=requests.get(URL,params=params)
+        myxml=fromstring(response.text)
+        return myxml
+    def gbisGetStation(self,x,y):
+        URL='http://openapi.gbis.go.kr/ws/rest/busstationservice/searcharound'
+        params={"ServiceKey":key["arrival"],"x":x,"y":y}
+        response=requests.get(URL,params=params)
+        myxml=fromstring(response.text)
+        return myxml
+    def gbisGetArrival(self,stationId,routeId,staOrder):
+        URL='http://openapi.gbis.go.kr/ws/rest/busarrivalservice'
+        params={"ServiceKey":key["arrival"],"stationId":stationId,"routeId":routeId,"staOrder":staOrder}
+        response=requests.get(URL,params=params)
+        myxml=fromstring(response.text)
+        return myxml
 tc = TmapCli()
-poi=tc.busstin(107475)
-print(poi)
-print(str(poi))
+result=tc.gbisGetStation(126.924173,37.525590)
+tstring=tostring(result)
+tstring=html.unescape(tstring.decode("utf-8"))
+print(tstring)
+"""
+result=result.find("msgBody").findall("itemList")
+arresult=tc.getArrivalInfo(result[0].findtext("arsId"))
+arresult=arresult.find("msgBody").findall("itemList")
+for i in arresult:
+    if i.findtext("rtNm")=="5012":
+        print(i.findtext("rerideNum1"))
+#print(tostring(result))
+#print(type(result))
+"""
