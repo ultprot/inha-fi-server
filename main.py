@@ -55,11 +55,11 @@ def detect_intent_texts(project_id, session_id, texts, language_code):
 
 #---------------------------tmap api,대중교통 api 용 클래스----------------------------------------
 class TmapCli:
-    def poiSearch(self,dest,lon=127.0017441,lat=37.5395634):    #poi검색
+    def poiSearch(self,dest,lon=127.0017441,lat=37.5395634,areaCode=11):    #poi검색
         URL='https://api2.sktelecom.com/tmap/pois'  #get URL
         params=\
         {'version':'1','page':'1','count':'10',\
-        'searchKeyword':dest,'areaLLCode':'11','areaLMCode':'000',\
+        'searchKeyword':dest,'areaLLCode':areaCode,'areaLMCode':'000',\
         'resCoordType':'WGS84GEO','searchType':'name','multiPoint':'N',\
         'searchtypCd':'A','radius':'1','reqCoordType':'WGS84GEO',\
         'centerLon':lon,'centerLat':lat}
@@ -118,12 +118,32 @@ class TmapCli:
         response=requests.get(URL,params=params)
         myxml=fromstring(response.text)
         return myxml
-    def getArrivalInfo(self,arsId):
+    def getArrivalInfo(self,arsId): #도착 정보 조회
         URL='http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid'
         params={"ServiceKey":key["arrival"], "arsId":arsId}
         response=requests.get(URL,params=params)
         myxml=fromstring(response.text)
         return myxml
+    def getAreaClass(self):
+        URL='https://api2.sktelecom.com/tmap/poi/areascode'
+        params=\
+        {'version':'1','count':'30','page':'1',\
+        'areaTypCd':'01','largeCdFlag':'Y','middleCdFlag':'Y'}
+        headers=\
+        {'Accept':'application/json',\
+        'Content-Type':'application/json;charset=UTF-8',\
+        'appKey':key["tmap"]}
+        response=requests.get(URL,params=params,headers=headers)
+        resultJson=json.loads(response.text)
+        return resultJson
+    def getReverseGeo(self,lat,lon):
+        URL='https://api2.sktelecom.com/tmap/geo/reversegeocoding'
+        params={'version':'1','lat':lat,'lon':lon,}
+        headers={'Accept':'application/json',\
+        'appKey':key["tmap"]}
+        response=requests.get(URL,params=params,headers=headers)
+        resultJson=json.loads(response.text)
+        return resultJson
 #-----------------------------------------------------------------------------------
 
 #----------------------
@@ -151,10 +171,11 @@ def query():
         if intent == "destination": #길찾기 인텐트
             lat=request.get_json()['lat']
             lon=request.get_json()['lon']
+            areaCode=request.get_json()['areaCode']
             destination=response_json["parameters"]["dest"] #목적지
             fulfillmentText=response_json["fulfillmentText"]    #대답 
             tc=TmapCli()    #tmap 인스턴스
-            poi=tc.poiSearch(destination,lon,lat)   #사용자 위치, 목적지로 poi검색
+            poi=tc.poiSearch(destination,lon,lat,areaCode)   #사용자 위치, 목적지로 poi검색
             rstJson={"sessionID":sessionID,"intent":intent,\
             "fulfillmentText":fulfillmentText, "data":poi,}#poi 결과 담아서 보냄
             response=Response(
@@ -170,9 +191,10 @@ def query():
             data={}
             if response_json["parameters"]["poi_number"] != "":
                 data["number"]=response_json["parameters"]["poi_number"]
-            elif "poi_dest" in response_json["parameters"]:
+            elif response_json["parameters"]["poi_dest"]!="":
                 data["dest"]=response_json["parameters"]["poi_dest"]
             rstJson["data"]=data
+            print(rstJson)
             response=Response(
                 response=json.dumps(rstJson,ensure_ascii=False),
                 status=200,
@@ -240,11 +262,49 @@ def query():
             return response
         
         elif intent=="search":
-            search_criteria=response_json["parameters"]["criteria"]
             search_object=response_json["parameters"]["dest"]
-            search_result=str(search_criteria)+" "+str(search_object)
-            return search_result
+            tc=TmapCli()
+            pois=tc.poiSearch(search_object,longitude,latitude)
+            fulfillmentText=response_json["fulfillmentText"]
+            rstJson={"sessionID":sessionID,"intent":intent,\
+            "fulfillmentText":fulfillmentText, "data":pois}
+            response=Response(
+                response=json.dumps(rstJson,ensure_ascii=False),
+                status=200,
+                mimetype='application/json;charset=UTF-8'
+            )
+            return response
+
+        elif intent=="search_select":
+            fulfillmentText=response_json["fulfillmentText"]    #대답
+            rstJson={"sessionID":sessionID, "intent":intent,"fulfillmentText":fulfillmentText}
+            data={}
+            if(response_json["parameters"]["number"]!=""):
+                data["number"]=response_json["parameters"]["number"]
+                print(data["number"])
+            elif(response_json["parameters"]["name"]!=""):
+                data["name"]=response_json["parameters"]["name"]
+            rstJson["data"]=data
+            response=Response(
+                response=json.dumps(rstJson,ensure_ascii=False),
+                status=200,
+                mimetype='application/json;charset=UTF-8'
+            )
+            return response
         
+        elif intent=="search_destination":
+            fulfillmentText=response_json["fulfillmentText"]    #대답
+            tc=TmapCli()
+            data=tc.publicSearch(longitude,latitude,request.get_json()["endLon"],request.get_json()["endLat"])
+            rstJson={"sessionID":sessionID, "intent":intent,"fulfillmentText":fulfillmentText,\
+            "data":data}
+            response=Response(
+                response=json.dumps(rstJson,ensure_ascii=False),
+                status=200,
+                mimetype='application/json;charset=UTF-8'
+            )
+            return response
+
         elif intent=="Default Welcome Intent":
             welcome=response_json["fulfillmentMessages"][0]["text"]["text"][0]
             welcome=str(welcome)
@@ -277,6 +337,41 @@ def pedes():
         return response
 #-----------------------------------------------------------------------------------------------------------------------
 
+#-----------------------지역 분류 코드 --------------------------------------------------------
+@app.route("/areaclass",methods=['POST'])
+def areaclass():
+    if request.method=='POST':
+        lat=request.get_json()['lat']
+        lon=request.get_json()['lon']
+        tc=TmapCli()
+        city=tc.getReverseGeo(lat,lon)["addressInfo"]["city_do"][0:2]
+        codes=tc.getAreaClass()["areaCodeInfo"]["poiAreaCodes"]
+        for cd in codes:
+            if cd["districtName"]==city:
+                code=cd["largeCd"]
+        rstJson={"largeCd":code}
+        response=Response(
+            response=json.dumps(rstJson,ensure_ascii=False),
+            status=200,
+            mimetype='application/json;charset=UTF-8'
+        )
+        return response
+#--------------------------------------------------------------------------------------
+
+#-----------------------지역 분류 코드 --------------------------------------------------------
+@app.route("/testjson",methods=['POST'])
+def testjson():
+    if request.method=='POST':
+        data=request.get_json()
+        print(data)
+        rstJson=data
+        response=Response(
+            response=json.dumps(rstJson,ensure_ascii=False),
+            status=200,
+            mimetype='application/json;charset=UTF-8'
+        )
+        return response
+#--------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
 	app.run(host='0.0.0.0', port=26531)

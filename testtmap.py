@@ -77,11 +77,34 @@ class TmapCli:
         response=requests.get(URL,params=params)
         myxml=fromstring(response.text)
         return myxml
+    def getAreaClass(self):
+        URL='https://api2.sktelecom.com/tmap/poi/areascode'
+        params=\
+        {'version':'1','count':'30','page':'1',\
+        'areaTypCd':'01','largeCdFlag':'Y','middleCdFlag':'Y'}
+        headers=\
+        {'Accept':'application/json',\
+        'Content-Type':'application/json;charset=UTF-8',\
+        'appKey':key["tmap"]}
+        response=requests.get(URL,params=params,headers=headers)
+        resultJson=json.loads(response.text)
+        return resultJson
+    def getReverseGeo(self,lat,lon):
+        URL='https://api2.sktelecom.com/tmap/geo/reversegeocoding'
+        params={'version':'1','lat':lat,'lon':lon,}
+        headers={'Accept':'application/json',\
+        'appKey':key["tmap"]}
+        response=requests.get(URL,params=params,headers=headers)
+        resultJson=json.loads(response.text)
+        return resultJson
 tc = TmapCli()
-result=tc.gbisGetStation(126.924173,37.525590)
-tstring=tostring(result)
-tstring=html.unescape(tstring.decode("utf-8"))
-print(tstring)
+city=tc.getReverseGeo(37.3333,127.3333)["addressInfo"]["city_do"][0:2]
+codes=tc.getAreaClass()["areaCodeInfo"]["poiAreaCodes"]
+code=""
+for cd in codes:
+    if cd["districtName"]==city:
+        code=cd["largeCd"]
+print(code)
 """
 result=result.find("msgBody").findall("itemList")
 arresult=tc.getArrivalInfo(result[0].findtext("arsId"))
